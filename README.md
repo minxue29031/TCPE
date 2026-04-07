@@ -1,4 +1,4 @@
-# 🧠  TCPE: TransCoder-based Precise Editing
+#  TCPE: TransCoder-based Precise Editing
 
  
 This repository implements **TCPE (TransCoder-based Precise Editing)**, a framework for **interpretable, neuron-level knowledge editing** in large language models (LLMs).
@@ -19,7 +19,7 @@ pip install -r requirements.txt
 ```
  
 
-## 🚀 Experiment Setup
+## Experiment Setup
 
 1. **Generate TransCoder layer files**
 
@@ -54,5 +54,9 @@ pip install -r requirements.txt
    * Adjust `--lim` and `--abla_exp` according to your experimental setup.
    * Outputs will be stored in the designated experiment folder for later evaluation.
 
+
+## Acknowledgments
+
+We gratefully acknowledge that our training code is heavily inspired by **TransCoder** ([GitHub](https://github.com/jacobdunefsky/transcoder_circuits)) and **ROME** ([GitHub](https://github.com/kmeng01/rome)). We thank the authors for their foundational work.
 
  
