@@ -1,0 +1,296 @@
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import torch
+import gc
+import argparse
+import pandas as pd
+from tqdm import tqdm
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface.transcoder_adapter import TranscoderAdapter
+from sae_training.config import LanguageModelSAERunnerConfig
+from tcpe.tcpe_pre import TCPEHyperParams
+from experiments.py.demo_allprompt import demo_model_editing
+from d_running.unit_test import unit_test
+from d_running.evaluation_multierror import run_eval, create_clustering
+import wandb
+
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
+# Function to parse arguments
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Run model editing with TCPE.")
+    
+    # Model loading and KE types
+    parser.add_argument('--MODEL_NAME', type=str, required=True, help='codellama/CodeLlama-7b-Instruct-hf, beowolx/MistralHermes-CodePro-7B-v1, ise-uiuc/Magicoder-S-DS-6.7B')
+    parser.add_argument("--layer_num", type=int, required=True, help="Layer number for model editing")
+    parser.add_argument('--TC_layer_file', type=str, required=False, help='Path to TransCoder layer file')
+    parser.add_argument('--output_file_path', type=str, required=False, help='Path to save translation results')
+    parser.add_argument('--alg_name', type=str, required=True, help='TCPE_PRE, TCPE, noKE')
+
+    # Arguments for KE
+    parser.add_argument('--mlp_or_tc', type=str, default="MLP", required=False, help='Load covariance matrix: MLP, TC_ef2, TC_ef3, TC_ef4, TC_ef6, TC_ef8, TC_ef10')
+    parser.add_argument("--mom2_n_samples", type=int, required=False, help="Number of samples for computing covariance matrix")
+    parser.add_argument("--mom2_dataset", type=str, required=False, help="dataset for computing covariance matrix")
+    parser.add_argument("--epsilon", type=float, default=0, required=False, help="Avoid covariance matrix diagonal being 0: 1e-8 or 0")
+    parser.add_argument("--v_num_grad_steps", type=int, required=False, help="Number of gradient steps for optimization")
+    parser.add_argument("--v_lr", type=float, required=False, help="Learning rate for optimization")
+    parser.add_argument("--clamp_norm_factor", type=int, required=False, help="Clamp factor for weight updates")
+    parser.add_argument('--edit_sequence_path', type=str, required=False, default="data/request/requests_last_subject_token_mainerrors.csv", help='KE requests & target cluster')
+    parser.add_argument('--i', type=int, required=False, help='Index for selecting a specific sequence')
+    parser.add_argument('--fact_token', type=str, default="subject_last",  required=False, help='subject_last, last')
+
+    # Arguments for KE_STAR
+    parser.add_argument("--save_k_v_upd", action="store_true", help="Save the update matrix to a file")
+    parser.add_argument('--save_path', type=str, required=False, default="./k_v_upd/", help='Path to save/load key,value,upd_matrix file')
+    parser.add_argument("--upd_decay", type=float, required=False, default=1.0 ,help="Decay factor for weight updates")
+    parser.add_argument("--lim", type=float, nargs='+', required=False, help="Limit to select k_star active points with varying activity levels")
+    parser.add_argument("--abla_exp", action="store_true", help="Perform ablation experiment")
+    parser.add_argument( '--save_path_list', type=str, nargs='+', required=False, help='List of paths to save/load key, value, upd_matrix files')
+    parser.add_argument( '--upd_decay_list', type=float, nargs='+', required=False, help='List of decay factors for weight updates, one per save_path')
+
+
+
+    # Arguments for unit test & evaluation
+    parser.add_argument('--container_workspace', type=str, required=False, default="container_workspace")
+    parser.add_argument("--d_params_path", type=str, required=False, default="d_running/data/d_with_params")
+    parser.add_argument("--originals_path", required=False, default="d_running/geeks4geeks/")
+    parser.add_argument("--translate_only", "-t", action="store_true")
+    parser.add_argument("--invalidate_cache", "-i", action="store_true")
+    parser.add_argument("--translation_batch_size", type=int, required=False, help="Translation batch size")
+    parser.add_argument('--preKE_cluster_result', type=str, required=False, help='Path to cluster without KE')
+    parser.add_argument("--max_length", type=int, required=False, default=8, help="classify error based on first n tokens.")
+    parser.add_argument("--threshold", type=float, required=False, default=0.9, help="classify error based on similarity.")
+    parser.add_argument("--embedding_model", type=str, required=False, default="Alibaba-NLP/gte-base-en-v1.5")
+
+
+    return parser.parse_args()
+
+# Initialize WandB
+def init_wandb(args):
+    wandb.init(
+        project="TCPE_CODE",
+        config={
+            "TC_layer_file": args.TC_layer_file,
+            "KE_or_noKE": args.alg_name,
+            "request_path": args.edit_sequence_path,
+            "lim": args.lim,
+            "upd_decay_list": args.upd_decay_list,
+            "abla": args.abla_exp
+        }
+    )
+
+# Load the model and tokenizer
+def load_model_and_tokenizer(args):
+    # Load the model: if a Transcoder file is provided, load and replace the MLP layer
+    print(f">>>> Loading Pure model from {args.MODEL_NAME}...")
+    model = AutoModelForCausalLM.from_pretrained(
+        args.MODEL_NAME, torch_dtype=torch.float16, device_map="auto"
+    )
+    
+    if args.TC_layer_file:
+        print(f">>>> Loading Transcoder from {args.TC_layer_file}...")
+        with torch.serialization.safe_globals([LanguageModelSAERunnerConfig]):
+            adapter = TranscoderAdapter.load(args.TC_layer_file)
+
+        device = next(model.base_model.layers[args.layer_num].mlp.parameters()).device
+        model.base_model.layers[args.layer_num].mlp = adapter.to(model.dtype).to(device)
+    
+    # Load tokenizer
+    tok = AutoTokenizer.from_pretrained(args.MODEL_NAME)
+    print("========>> tok.pad_token: ", tok.pad_token)
+    
+    if tok.pad_token is None:
+        tok.add_special_tokens({"pad_token": "<pad>"})
+        model.config.pad_token_id = tok.pad_token_id
+        if hasattr(model, "model"):
+            model.model.padding_idx = model.config.pad_token_id
+        model.generation_config.pad_token_id = tok.pad_token_id
+        # potentially resize embedding and set padding idx
+        new_embedding_size = max(len(tok.vocab), model.config.vocab_size)
+        model.resize_token_embeddings(new_embedding_size)
+        new_embedding = torch.nn.Embedding(
+            new_embedding_size, model.config.hidden_size, tok.pad_token_id
+        )
+        old_embedding = model.get_input_embeddings()
+        new_embedding.to(old_embedding.weight.device, old_embedding.weight.dtype)
+        new_embedding.weight.data[: model.config.vocab_size] = old_embedding.weight.data
+        model.set_input_embeddings(new_embedding)
+        model.config.vocab_size = new_embedding_size    
+    
+    
+    print("Model and tokenizer loaded successfully!")
+    return model, tok
+
+# Hyperparameters for TCPE algorithm
+def set_hyperparameters(args):
+    hparams = TCPEHyperParams(**{
+        "layers": [args.layer_num],
+        "fact_token": args.fact_token,
+        "v_num_grad_steps": args.v_num_grad_steps,
+        "v_lr": args.v_lr,
+        "v_loss_layer": 31,
+        "v_weight_decay": 0.001,
+        "clamp_norm_factor": args.clamp_norm_factor,
+        "kl_factor": 0.0625,
+        "mom2_adjustment": True,
+        "context_template_length_params": [[10, 1]],  
+        "rewrite_module_tmp": "model.layers.{}.mlp.down_proj",
+        "layer_module_tmp": "model.layers.{}",
+        "mlp_module_tmp": "model.layers.{}.mlp",
+        "attn_module_tmp": "model.layers.{}.self_attn.o_proj",
+        "ln_f_module": "model.norm",
+        "lm_head_module": "lm_head",
+        "mom2_dataset": args.mom2_dataset,
+        "mom2_n_samples": args.mom2_n_samples,
+        "mom2_dtype": "float32",
+        "mlp_or_tc": args.mlp_or_tc,
+        "epsilon": args.epsilon
+    })
+    
+    wandb.config.update(hparams.__dict__)
+    
+    return hparams
+
+# Apply model editing
+def apply_model_editing(model, tok, request, args, hparams):
+    demo_model_editing(
+        model, tok, request,  
+        args.output_file_path, 
+        args.d_params_path,
+        args.originals_path, 
+        args.translation_batch_size,
+        args.lim,
+        args.upd_decay_list,
+        args.save_path_list,
+        args.save_path, 
+        args.save_k_v_upd,  
+        args.abla_exp, 
+        args.alg_name, 
+        hparams=hparams
+    )
+
+# Create clustering
+def collect_clustering(args):
+    create_clustering(
+        args.output_file_path, 
+        args.max_length, 
+        args.threshold
+    )
+
+
+# Run unit test
+def run_unit_test(args):
+    unit_test(
+        args.output_file_path, args.d_params_path, 
+        args.originals_path, args.translate_only, 
+        args.invalidate_cache, args.container_workspace
+    )
+
+# Run evaluation
+def run_evaluation(args, target_KE_cluster):
+    eval_results = run_eval(
+        args.output_file_path, 
+        args.preKE_cluster_result, 
+        target_KE_cluster,
+        args.max_length, 
+        args.threshold, 
+        args.embedding_model
+    )
+    return eval_results
+
+def get_tcpe_request_cluster(args):
+    all_info = pd.read_csv(args.edit_sequence_path, encoding="utf-8")
+    error_num = all_info.Error
+    error_descp = all_info.brief_description
+
+    print(f">>>> Target Error {list(error_num)}: {list(error_descp)}")
+
+    requests = []
+    for _, row in all_info.iterrows():
+        requests.append({
+            "prompt": row.prompt,
+            "subject": row.subject,
+            "target_new": {"str": row.target_new},
+        })
+
+    return requests, list(error_num), list(error_descp)
+
+
+# Save metrics to WandB
+def log_metrics(eval_results, target_KE_cluster, error_num, error_descp):
+    wandb.log({
+        "Error_NO.": error_num,
+        "Error_description": error_descp,
+        "Target_KE_Cluster": target_KE_cluster
+    })
+    
+    if eval_results and len(eval_results) > 0:
+        wandb.log({
+            "SubMetrics/ori_overall_accuracy": eval_results[0],
+            "SubMetrics/amount_targets": eval_results[1],
+            "SubMetrics/amount_targets_new": eval_results[2],
+            "SubMetrics/amount_targets_in_success": eval_results[3],
+            "SubMetrics/overall_accuracy_afterKE": eval_results[4]
+        })
+        
+        wandb.log({
+            "MainMetrics/accuracy_of_target_cluster": eval_results[5],
+            "MainMetrics/change_of_target_cluster": eval_results[6],
+            "MainMetrics/overall_accuracy_destroy": eval_results[7],
+            "MainMetrics/Specificity": eval_results[8],
+            "MainMetrics/Destructiveness": eval_results[9]
+        })
+    
+    else:
+        print("Skipping metric logging.")
+
+ 
+ 
+def main():
+    # Parse arguments and initialize WandB
+    args = parse_arguments()
+    init_wandb(args)
+    
+    # Load model, tokenizer, and set hyperparameters
+    model, tok = load_model_and_tokenizer(args)
+    hparams = set_hyperparameters(args)
+
+    # Prepare the request for KE
+    request, error_num, error_descp = get_tcpe_request_cluster(args)
+    
+    if args.mlp_or_tc == "MLP":
+        target_KE_group = ["6", "0", "8", "4"]
+    
+    if args.mlp_or_tc in ["TC_ef4", "TC_ef8", "TC_ef2.6875"]:
+        target_KE_group = ["2", "3", "0", "5"]
+        
+    
+    print("==========>>request:", request)
+    print("==========>>target_KE_group:", target_KE_group)
+  
+    
+    # Apply KE, run unit test, and evaluation
+    print("args.alg_name", args.alg_name)
+    apply_model_editing(model, tok, request, args, hparams)
+
+    run_unit_test(args)
+
+    if args.alg_name != "noKE":
+        eval_results = run_evaluation(args, target_KE_group)
+    else:
+        eval_results = []
+        collect_src_error = collect_clustering(args)
+
+    # Save results to WandB
+    log_metrics(eval_results, target_KE_group, error_num, error_descp)
+
+    wandb.finish()
+
+    print("Model editing, unit testing, and evaluation complete!")
+ 
+if __name__ == "__main__":
+    main()
