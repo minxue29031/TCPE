@@ -35,7 +35,7 @@ for lim_list in "${lim_combinations[@]}"; do
             --MODEL_NAME "codellama/CodeLlama-7b-Instruct-hf" \
             --layer_num "$layer_num" \
 			--TC_layer_file "transcoder_path" \
-            --output_file_path "TC_k_v_w/output/allprompt_layer${layer_num}_TC_ef${expansion_factor}_lim${lim_id}_decay${decay_id}2" \
+            --output_file_path "output/allprompt_layer${layer_num}_TC_ef${expansion_factor}_lim${lim_id}_decay${decay_id}" \
             --alg_name "TCPE" \
 			--edit_sequence_path "data/request/requests_last_subject.csv" \
             --container_workspace "container_workspace" \
