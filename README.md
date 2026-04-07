@@ -22,7 +22,8 @@ pip install -r requirements.txt
 ## 🚀 Experiment Setup
 
 1. **Generate TransCoder layer files**
-   First, use the [Transcoder Circuits repository](https://github.com/jacobdunefsky/transcoder_circuits) to generate the **TransCoder for the target model layer** for interpretability analysis.
+
+   First, use the [Transcoder Circuits repository](https://github.com/jacobdunefsky/transcoder_circuits) to generate the **TransCoder for the target layer** for interpretability analysis.
 
  
 2. **Run TCPE Preprocessing**
