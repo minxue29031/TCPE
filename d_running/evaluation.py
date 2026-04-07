@@ -192,6 +192,16 @@ def compute_metrics(current_dir, old_cluster, cluster_edited_last):
     ori_overall_accuracy = amount_succ_ori / total_samples
     overall_accuracy_destroy = overall_accuracy/ori_overall_accuracy
     
+    print(">> ori_overall_accuracy", ori_overall_accuracy)
+    print(">> ori_target_cluster_size:", amount_targets)
+    print(">> curr_target_cluster_size:", amount_targets_new)
+    print(">> successful_translations:", amount_targets_in_success)
+    print(">> overall_accuracy:", overall_accuracy)
+    print(">>>> accuracy_of_target_cluster:", accuracy_of_target_cluster)
+    print(">>>> size_change_of_target_cluster:", change_of_target_cluster)
+    print(">>>> overall_accuracy_destroy:", overall_accuracy_destroy)
+    print(">>>> specificity:", specificity)
+    print(">>>> destructiveness:", destructiveness)
     
     return ori_overall_accuracy, amount_targets, amount_targets_new, amount_targets_in_success, overall_accuracy, accuracy_of_target_cluster, change_of_target_cluster,overall_accuracy_destroy, specificity, destructiveness
  
@@ -200,29 +210,6 @@ def compute_metrics(current_dir, old_cluster, cluster_edited_last):
 def run_eval(current_dir, old_cluster, cluster_edited_last, max_length, threshold, embedding_model): 
     create_clustering(current_dir, max_length, threshold)
     map_clustering(embedding_model, current_dir, old_cluster, max_length, threshold)
-    
-    (
-        ori_overall_accuracy,
-        amount_targets,
-        amount_targets_new,
-        amount_targets_in_success,
-        overall_accuracy,
-        accuracy_of_target_cluster,
-        change_of_target_cluster,
-        overall_accuracy_destroy,
-        specificity,
-        destructiveness,
-    ) = compute_metrics(current_dir, old_cluster, cluster_edited_last)
-    
-    return (
-        ori_overall_accuracy,
-        amount_targets,
-        amount_targets_new,
-        amount_targets_in_success,
-        overall_accuracy,
-        accuracy_of_target_cluster,
-        change_of_target_cluster,
-        overall_accuracy_destroy,
-        specificity,
-        destructiveness,
-    )
+    ori_overall_accuracy, amount_targets, amount_targets_new, amount_targets_in_success, overall_accuracy, accuracy_of_target_cluster, change_of_target_cluster,overall_accuracy_destroy, specificity, destructiveness = compute_metrics(current_dir, old_cluster, cluster_edited_last)
+    return ori_overall_accuracy, amount_targets, amount_targets_new, amount_targets_in_success, overall_accuracy, accuracy_of_target_cluster, change_of_target_cluster,overall_accuracy_destroy, specificity, destructiveness
+

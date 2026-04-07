@@ -106,7 +106,6 @@ def map_clustering(embedding_model, current_dir, old_cluster, max_length, thresh
     print(f"Successfully reconstructed the cluster data to {current_json_path}")
 
     # cleanup
- 
     clustering = cluster_creation.load_clustering(current_dir)
     cluster_creation.print_cluster_statistics(clustering)
 
@@ -117,6 +116,7 @@ def map_clustering(embedding_model, current_dir, old_cluster, max_length, thresh
         color="skyblue",
     )
 
+
 def compute_metrics(current_dir, old_cluster, clusters_edited_last):
     print("Compute metrics:")
     old_clustering = cluster_creation.load_clustering(old_cluster)
@@ -126,6 +126,8 @@ def compute_metrics(current_dir, old_cluster, clusters_edited_last):
     for cluster_id in clusters_edited_last:
         targets.extend([entry["path"] for entry in old_clustering[cluster_id]])
     amount_targets = len(targets)
+
+    print(">>>>>>>>>>>>>> total target samples:", amount_targets)
 
     success_cluster_new = current_clustering["Success"]
     targets_in_success = [entry for entry in success_cluster_new if entry["path"] in targets]
@@ -138,7 +140,6 @@ def compute_metrics(current_dir, old_cluster, clusters_edited_last):
 
     accuracy_of_target_cluster = amount_targets_in_success / amount_targets
     change_of_target_cluster = amount_targets_new / amount_targets
-
 
     non_target_samples_old = [
         (entry["path"], cluster_id)
@@ -163,10 +164,12 @@ def compute_metrics(current_dir, old_cluster, clusters_edited_last):
 
     specificity = unchanged_samples / len(non_target_samples_old)
 
+    # Overall accuracy
     total_samples = sum(len(cluster) for cluster in current_clustering.values())
     correctly_translated_samples = len(success_cluster_new)
     overall_accuracy = correctly_translated_samples / total_samples
 
+    # Destructiveness
     old_correct_samples = {entry["path"] for entry in old_clustering["Success"]}
     new_success_paths = {entry["path"] for entry in success_cluster_new}
     correct_became_faulty = old_correct_samples - new_success_paths
@@ -174,6 +177,17 @@ def compute_metrics(current_dir, old_cluster, clusters_edited_last):
 
     ori_overall_accuracy = len(old_clustering["Success"]) / total_samples
     overall_accuracy_destroy = overall_accuracy / ori_overall_accuracy
+
+    print(">> ori_overall_accuracy", ori_overall_accuracy)
+    print(">> ori_target_cluster_size:", amount_targets)
+    print(">> curr_target_cluster_size:", amount_targets_new)
+    print(">> successful_translations:", amount_targets_in_success)
+    print(">> overall_accuracy:", overall_accuracy)
+    print(">>>> accuracy_of_target_cluster:", accuracy_of_target_cluster)
+    print(">>>> size_change_of_target_cluster:", change_of_target_cluster)
+    print(">>>> overall_accuracy_destroy:", overall_accuracy_destroy)
+    print(">>>> specificity:", specificity)
+    print(">>>> destructiveness:", destructiveness)
 
     return (
         ori_overall_accuracy,
@@ -195,13 +209,4 @@ def run_eval(current_dir, old_cluster, clusters_edited_last, max_length, thresho
     return compute_metrics(current_dir, old_cluster, clusters_edited_last)
 
 
-
-if __name__ == "__main__":
-    current_dir = "path_to_current_dir"
-    old_cluster = "current_old_cluster"
-    cluster_edited_last = ["0", "2", "3", "5"]
-    max_length = 8
-    threshold = 0.9
-    embedding_model = "Alibaba-NLP/gte-base-en-v1.5"
-
-    run_eval(current_dir, old_cluster, cluster_edited_last, max_length, threshold, embedding_model)
+ 

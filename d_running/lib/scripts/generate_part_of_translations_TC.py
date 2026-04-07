@@ -68,6 +68,6 @@ if __name__ == "__main__":
     parser.add_argument("--tc_layer_path", type=str, required=True)
     parser.add_argument("--outs_path", default=None)
     parser.add_argument("--d_params_path", default="data/d_with_params")
-    parser.add_argument("--originals_path", default="path_to_geeks4geeks")
+    parser.add_argument("--originals_path", default="/nfs/data/geeks4geeks/")
 
     main(parse_compound_defaults(parser.parse_args()))

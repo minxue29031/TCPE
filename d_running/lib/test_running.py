@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Dict
 
 IMAGE = "alpine"
-CONTAINER_NAME = "d_tests"
+CONTAINER_NAME = "erik_d_tests"
 DEPENDENCIES = ["gcc", "g++", "dmd", "python3", "py3-tqdm"]
 PATH_TO_SCRIPTS = Path(__file__).absolute().parent.joinpath("scripts")
 

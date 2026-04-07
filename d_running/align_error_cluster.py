@@ -64,6 +64,7 @@ class TextCluster:
         return new_df
 
     def most_common_or_empty(self, row):
+        # To ensure reliability, we match 5 times. And we consider a match successful only if the match_count >=  4.
         groups = [row[f'rename_group_{i}'] for i in range(1, 6)]
         group_count = Counter(groups)
         most_common_group, count = group_count.most_common(1)[0] if group_count else (None, 0)
@@ -120,24 +121,4 @@ class TextCluster:
                 continue
         return max(numeric_groups) if numeric_groups else 0
 
-
-if __name__ == "__main__":
-
-    ori_csv_path = 'path_to_cluster_ori.csv'
-    new_csv_path = 'path_to_cluster_new.csv' 
-    embedding_model="Alibaba-NLP/gte-base-en-v1.5"
-    max_length = 6
-    threshold = 0.9
-    
-    update_process_clsuter_path = 'path_to_update_cluster_process.csv'
-    updated_cluster_path = 'path_to_updated_current_cluster.csv'
-    update_source_cluster_path = 'path_to_update_source_cluster.csv'  
-
-    text_cluster = TextCluster(embedding_model, max_length, threshold)
-    text_cluster.process_clusters(
-        ori_csv=ori_csv_path,
-        new_csv=new_csv_path,
-        update_process_csv=update_process_clsuter_path,
-        updated_cluster_csv=updated_cluster_path,
-        update_source_cluster_csv=update_source_cluster_path
-    )
+ 
