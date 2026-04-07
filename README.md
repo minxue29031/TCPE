@@ -50,9 +50,9 @@ pip install -r requirements.txt
    * `--lim` → Sets the limit on active neurons, allowing experiments with different activity levels.
    * `--abla_exp` → Enables ablation experiments to measure the impact of interventions on the model.
    
-    **Notes:**
-    * Ensure that preprocessing (Step 2) has been completed, as the generated update matrices are required.
-    * Adjust `--lim` and `--abla_exp` according to your experimental setup.
+   **Notes:** 
+   * Ensure that preprocessing (Step 2) has been completed, as the generated update matrices are required.
+   * Adjust `--lim` and `--abla_exp` according to your experimental setup.
  
 ## Acknowledgments
 
