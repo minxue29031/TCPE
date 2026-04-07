@@ -21,12 +21,12 @@ pip install -r requirements.txt
 
 ## Experiment Setup
 
-1. **Generate TransCoder layer files**
+**<h3>1. Generate TransCoder layer files</h3>**
 
    First, use the [Transcoder Circuits repository](https://github.com/jacobdunefsky/transcoder_circuits) to generate the **TransCoder for the target layer** for interpretability analysis.
 
  
-2. **Run TCPE Preprocessing**
+**<h3>2. Run TCPE Preprocessing</h3>**
 
    This step precomputes the update matrices for different types of errors, which are required for subsequent experiments.
 
@@ -36,7 +36,7 @@ pip install -r requirements.txt
    **Notes:** 
    TransCoder neurons are sparse by nature — only a small subset of neurons activate for any given input. As a result, the quality of the precomputed update matrices is sensitive to the choice of hyperparameters. With poorly chosen values, the set of active neurons may be too small or even empty, yielding zero or degenerate updates. The sweep in tcpe_precompute.sh explores different hyperparameter configurations to identify settings that produce valid, non-trivial update matrices before proceeding to the editing step.
 
-4. **Run TCPE Knowledge Editing**
+**<h3>3. Run TCPE Knowledge Editing</h3>**
  
    This step applies TCPE to perform neuron-level knowledge editing on the model.
    
