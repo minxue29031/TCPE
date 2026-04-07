@@ -32,4 +32,4 @@ class TCPEHyperParams(HyperParams):
     mom2_dtype: str
     mlp_or_tc:str
     epsilon: float
-    neurons_csv_path: str 
+ 

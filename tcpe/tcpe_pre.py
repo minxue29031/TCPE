@@ -19,7 +19,7 @@ from .tcpe_hparams import TCPEHyperParams
 CONTEXT_TEMPLATES_CACHE = None
  
 
-def apply_rome_tc_to_model(
+def tcpe_precompute(
         model: AutoModelForCausalLM,
         tok: AutoTokenizer,
         requests: List[Dict],
@@ -29,6 +29,14 @@ def apply_rome_tc_to_model(
         copy=False,
         return_orig_weights=False,
 ) -> Tuple[AutoModelForCausalLM, List[str]]:
+    """
+    Returns a model with the desired changes.
+
+    :param copy: If true, will preserve the original model while creating a new one to edit.
+        Note that you are responsible for deallocating the new model's memory to avoid leaks.
+
+    :return: (1) the updated model, (2) an original copy of the weights that changed
+    """
 
     if copy:
         model = deepcopy(model)
@@ -36,7 +44,7 @@ def apply_rome_tc_to_model(
     weights_copy = {}
     
     for i, request in enumerate(requests):
-        deltas, non_zero_k_star_count, non_zero_k_star_indices, non_zero_k_star_values = execute_rome_tc(model, tok, request, hparams)
+        deltas, non_zero_k_star_count, non_zero_k_star_indices, non_zero_k_star_values = execute_rome(model, tok, request, hparams)
 
         with torch.no_grad():
             for w_name, (delta_u, delta_v) in deltas.items():
@@ -48,7 +56,6 @@ def apply_rome_tc_to_model(
                 if return_orig_weights and w_name not in weights_copy:
                     assert i == 0
                     weights_copy[w_name] = w.detach().clone()
-                    
                 c2=w.norm()
                 w[...] += upd_matrix 
 
@@ -60,14 +67,18 @@ def apply_rome_tc_to_model(
                 })     
 
                 if save_k_v_upd:
+                    print("---Save Upd Matrix, K_Star Index File, K_Star Value File---")
                     os.makedirs(save_path, exist_ok=True) 
                     
+                    # Save the Kstar indices
                     index_file_path = os.path.join(save_path, "index.pt")
                     torch.save(non_zero_k_star_indices, index_file_path)
                     
+                     # Save the Kstar values.
                     value_file_path = os.path.join(save_path, "value.pt")
                     torch.save(non_zero_k_star_values, value_file_path)
                  
+                    # Save the update matrix
                     upd_file_path = os.path.join(save_path, "upd.pt")
                     upd_matrix_num = upd_matrix.cpu().numpy()
                     torch.save(upd_matrix_num, upd_file_path)
@@ -77,30 +88,38 @@ def apply_rome_tc_to_model(
 
 
     
-def execute_rome_tc(
+def execute_rome(
     model: AutoModelForCausalLM,
     tok: AutoTokenizer,
     request: Dict,
     hparams: TCPEHyperParams,
 ) -> Dict[str, Tuple[torch.Tensor]]:
+    """
+    Executes the ROME update algorithm for the specified update at the specified layer
+    Invariant: model at beginning of function == model at end of function
+    """
 
-
+    # Update target and print info
     request = deepcopy(request)
     print(
+        f"Executing ROME algorithm for the update: "
         f"[{request['prompt'].format(request['subject'])}] -> [{request['target_new']['str']}]"
     )
 
+    # Retrieve weights that user desires to change
     weights = {
         f"{hparams.rewrite_module_tmp.format(layer)}.weight": nethook.get_parameter(
             model, f"{hparams.rewrite_module_tmp.format(layer)}.weight"
         )
         for layer in hparams.layers
     }
-
+    # Save old weights for future restoration
     weights_copy = {k: v.detach().clone() for k, v in weights.items()}
 
+    # Update loop: sequentially intervene at each specified layer
     deltas = {}
     for layer in sorted(hparams.layers):
+        # Compute rank-1 update matrix
         left_vector, k_star = compute_u(
             model,
             tok,
@@ -111,8 +130,8 @@ def execute_rome_tc(
         )
         
         non_zero_k_star = (k_star != 0)
-        non_zero_k_star_count = non_zero_k_star.sum().item() 
-        non_zero_k_star_indices = non_zero_k_star.nonzero(as_tuple=True)[0]
+        non_zero_k_star_count = non_zero_k_star.sum().item()  # The number of non-zero elements
+        non_zero_k_star_indices = non_zero_k_star.nonzero(as_tuple=True)[0]  # The index of the non-zero element
         non_zero_k_star_values = k_star[non_zero_k_star]
         
         print("Left vector shape:", left_vector.shape)
@@ -129,31 +148,42 @@ def execute_rome_tc(
         print("Right vector shape:", right_vector.shape)
 
         with torch.no_grad():
+            # Determine correct transposition of delta matrix
             weight_name = f"{hparams.rewrite_module_tmp.format(layer)}.weight"
             upd_matrix = left_vector.unsqueeze(1) @ right_vector.unsqueeze(0)
             upd_matrix = upd_matrix_match_shape(upd_matrix, weights[weight_name].shape)
 
+            # Update model weights and record desired changes in `delta` variable
             weights[weight_name][...] += upd_matrix
             deltas[weight_name] = (
                 left_vector.detach(),
                 right_vector.detach(),
             )
-            
+
+    # Restore state of original model
     with torch.no_grad():
         for k, v in weights.items():
             v[...] = weights_copy[k]
 
     print(f"Deltas successfully computed for {list(weights.keys())}")
+
     return deltas, non_zero_k_star_count, non_zero_k_star_indices, non_zero_k_star_values
 
-
 def upd_matrix_match_shape(matrix: torch.Tensor, shape: torch.Size) -> torch.Tensor:
+    """
+    GPT-2 and GPT-J have transposed weight representations.
+    Returns a matrix that matches the desired shape, else raises a ValueError
+    """
+
     if matrix.shape == shape:
         return matrix
     elif matrix.T.shape == shape:
         return matrix.T
     else:
-        raise ValueError("Check for bugs in the code?")
+        raise ValueError(
+            "Update matrix computed by ROME does not match original weight shape. "
+            "Check for bugs in the code?"
+        )
 
 
 def clear_context_templates():

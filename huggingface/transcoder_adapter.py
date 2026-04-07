@@ -37,6 +37,8 @@ class TranscoderAdapter(nn.Module):
             self.d_out = cfg.d_out
 
         self.up_proj = nn.Linear(in_features = self.d_in, out_features = self.d_sae)
+
+        # Use the same name and class as CodeLlama to stay compatible with ROME
         self.down_proj = nn.Linear(in_features = self.d_sae, out_features = self.d_out)
 
         anthropic_style_weight_init(self.up_proj)
@@ -94,4 +96,4 @@ def test_correctness(path_to_weights, N=1_000, device="cpu"):
     return f"{100 * (correct / N):.2f}"
 
 if __name__ == "__main__":
-    print(test_correctness('/path/final_sparse_autoencoder_CodeLlama-7b-Instruct-hf_blocks.19.ln2.hook_normalized_16384.pt'))
+    print(test_correctness('/nfs/data/shared/codellama-transcoders/12ok1dny/final_sparse_autoencoder_CodeLlama-7b-Instruct-hf_blocks.19.ln2.hook_normalized_16384.pt'))

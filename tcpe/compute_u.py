@@ -4,6 +4,7 @@ from typing import Dict, List
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
 from tcpe import repr_tools
 from util.globals import *
 
@@ -27,6 +28,7 @@ def get_inv_cov(
     Retrieves covariance statistics, then computes the algebraic inverse.
     Caches result for future use.
     """
+
     global inv_mom2_cache
 
     model_name = model.config._name_or_path.replace("/", "_")
@@ -49,10 +51,13 @@ def get_inv_cov(
             precision=mom2_dtype,
         )
         
+        
         dtype = getattr(torch, mom2_dtype)
         mom2 = stat.mom2.moment().float().to("cpu")
-        inv_mom2_cache[key] = torch.inverse(mom2 + epsilon * torch.eye(mom2.size(0), device="cpu")).type(dtype)
         
+        #inv_mom2_cache[key] = torch.inverse(mom2).type(dtype)
+        inv_mom2_cache[key] = torch.inverse(mom2 + epsilon * torch.eye(mom2.size(0), device="cpu")).type(dtype)
+
     return inv_mom2_cache[key]
 
 
@@ -78,7 +83,7 @@ def compute_u(
         module_template=hparams.rewrite_module_tmp,
         track="in",
     )
-    
+
     if "subject_" in hparams.fact_token and hparams.fact_token.index("subject_") == 0:
         word = request["subject"]
         print(f"Selected u projection object {word}")
@@ -92,6 +97,9 @@ def compute_u(
         ).mean(0)
         
     elif hparams.fact_token == "last":
+        # Heuristic to choose last word. Not a huge deal if there's a minor
+        # edge case (e.g. multi-token word) because the function below will
+        # take the last token.
         cur_repr = repr_tools.get_reprs_at_idxs(
             contexts=[
                 templ.format(request["prompt"].format(request["subject"]))
@@ -104,6 +112,7 @@ def compute_u(
     else:
         raise ValueError(f"fact_token={hparams.fact_token} not recognized")
     
+    # Apply inverse second moment adjustment
     cur_repr = cur_repr.to(dtype=torch.float32)
     u = cur_repr
     
@@ -121,5 +130,18 @@ def compute_u(
         u = u.squeeze()
         
     u = u.to(dtype=torch.float16) 
+    
+    inv_cov = get_inv_cov(
+            model,
+            tok,
+            hparams.epsilon,
+            hparams.rewrite_module_tmp.format(layer),
+            hparams.mom2_dataset,
+            hparams.mom2_n_samples,
+            hparams.mom2_dtype,
+            hparams.mlp_or_tc,
+        ).to(cur_repr.device, dtype=torch.float32)
+    
     cur_repr = cur_repr.to(dtype=torch.float16) 
+
     return u / u.norm(), cur_repr

@@ -39,12 +39,15 @@ def compute_v(
 
     print("Computing right vector (v)")
 
+    # Compile list of rewriting and KL x/y pairs
     rewriting_prompts = [
+        # prompt in different contexts including target
         context.replace("{"*2, "{"*4).replace("}"*2, "}"*4).format(request["prompt"]) + request["target_new"]["str"].replace("{", "{"*2).replace("}", "}"*2)
         for context in context_templates
     ]
     kl_prompts = ["{} is a"]
 
+    # find target ids and remove last token from each rewriting prompt
     target_ids = []
     lookup_idxs = []
     for i, prompt in enumerate(rewriting_prompts):
@@ -64,6 +67,7 @@ def compute_v(
         padding=True,
     ).to(device)
 
+    # Compute rewriting targets
     rewriting_targets = torch.tensor(-100, device=device).repeat(
         len(rewriting_prompts), *input_tok["input_ids"].shape[1:]
     )
@@ -76,11 +80,14 @@ def compute_v(
         else:
             raise ValueError(f"Unknown padding side {tok.padding_side}")
 
+    # Finalize rewrite and loss layers
     loss_layer = max(hparams.v_loss_layer, layer)
     print(f"Rewrite layer is {layer}")
     print(f"Tying optimization objective to {loss_layer}")
 
-
+    # Set up an optimization over a latent vector that, when output at the
+    # rewrite layer, i.e. hypothesized fact lookup location, will induce the
+    # target token to be predicted at the final layer.
     n_embd = None
     if hasattr(model.config, "n_embd"):
         n_embd = model.config.n_embd
@@ -91,13 +98,17 @@ def compute_v(
     delta = torch.zeros((n_embd,), requires_grad=True, device=device)
     
     target_init, kl_distr_init = None, None
-    exec_count = 0   
+    exec_count = 0  # I hate everything about this
+    # Inserts new "delta" variable at the appropriate part of the computation
     def edit_output_fn(cur_out, cur_layer):
+        # This thing induces statefullness all over this entire implementation. Argghh
         nonlocal target_init, exec_count
 
         if cur_layer == hparams.mlp_module_tmp.format(layer):
+            # Store initial value of the vector of interest
             if target_init is None:
                 print("Recording initial value of v*")
+                # Initial value is recorded for the clean sentence
                 target_init = cur_out[0, lookup_idxs[0]].detach().clone()
 
             for i, idx in enumerate(lookup_idxs[exec_count: exec_count + len(cur_out)]):
@@ -180,7 +191,7 @@ def compute_v(
             f"{torch.exp(-nll_loss_each).mean().item()}"
         )
         
-        # esrly stop  
+        # esrly stop    
         if hparams.v_num_grad_steps >= 500:
             if prev_nll_loss - nll_loss < tolerance:
                 stagnant_steps += 1
@@ -192,8 +203,8 @@ def compute_v(
             if stagnant_steps >= patience:
                 print(f"Early stopping at step {it}, nll_loss did not decrease for {patience} steps.")
                 wandb.log({"early_stopping_step": it})
-                break      
-        
+                break 
+                
         # Backpropagate
         loss.backward()
         opt.step()
@@ -205,11 +216,14 @@ def compute_v(
                 delta[...] = delta * max_norm / delta.norm()
 
     target = target_init + delta.to(target_init.device)
+
     cur_output = get_module(model, hparams.rewrite_module_tmp.format(layer))(k_star)
 
     # Solving the linear system to compute the right vector
     right_vector = (target - cur_output) / torch.dot(k_star, left_vector)
+    
     torch.cuda.empty_cache()
+    
     
     wandb.log({
         "Delta norm": (target - cur_output).norm().item(),
@@ -274,6 +288,7 @@ def get_module_input_output_at_word(
 
     l_input, l_output = l_input[0], l_output[0]
     return l_input.detach(), l_output.detach()
+
 
 
 def find_fact_lookup_idx(

@@ -33,7 +33,7 @@ def main():
     """
     import argparse
 
-    parser = argparse.ArgumentParser(description="Statistics Collector")
+    parser = argparse.ArgumentParser(description="TCPE Statistics Collector")
 
     def aa(*args, **kwargs):
         parser.add_argument(*args, **kwargs)
@@ -121,12 +121,13 @@ def layer_stats(
             maxlen = batch_tokens
         return TokenizedDataset(raw_ds, tokenizer, maxlen=maxlen, field=FIELDS[ds_name])
 
-    batch_size = 100  
+    # Continue with computation of statistics
+    batch_size = 100  # Examine this many dataset texts at once
     npos = 1024
     if hasattr(model.config, "n_positions"):
         npos = model.config.n_positions
     if batch_tokens is None:
-        batch_tokens = npos * 3  
+        batch_tokens = npos * 3  # Sort and divide into batches with this many tokens
     if precision is None:
         precision = "float64"
     dtype = getattr(torch, precision)
@@ -150,6 +151,10 @@ def layer_stats(
                 exist_ok=True, parents=True
             )
             torch.hub.download_url_to_file(remote_url, filename)
+            # post-process precomputed covariances
+            # the original work summed all values and then computed the mean
+            # on-the-fly by dividing by the count
+            # we instead keep a running mean
             cached = unbox_numpy_null(np.load(filename))
             cached["mom2.mom2"] /= cached["mom2.count"]
             np.savez(filename, **box_numpy_null(cached))
@@ -159,6 +164,7 @@ def layer_stats(
             print(f"Unable to download due to {e}. Computing locally....")
 
     ds = get_ds() if not filename.exists() else None
+
     if progress is None:
         progress = lambda x: x
 
@@ -174,7 +180,6 @@ def layer_stats(
         random_sample=1,
         num_workers=2,
     )
-    
     batch_count = -(-(sample_size or len(ds)) // batch_size)
     with torch.no_grad():
         for batch_group in progress(loader, total=batch_count):
@@ -186,6 +191,7 @@ def layer_stats(
                     model(**batch)
                 batch = dict_to_(batch, tr.input.device)
                 feats = flatten_masked_batch(tr.input, batch["attention_mask"])
+                # feats = flatten_masked_batch(tr.output, batch["attention_mask"])
                 if torch.isinf(feats).any():
                     print("Skipping features containing infinity")
                     continue

@@ -1,6 +1,6 @@
 """
 Contains utilities for extracting token representations and indices
-from string templates. Used in computing the left and right vectors for ROME.
+from string templates. Used in computing the left and right vectors for TCPE.
 """
 
 from copy import deepcopy

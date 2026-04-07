@@ -1,5 +1,7 @@
 from typing import List, Optional
+
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
 from util.logit_lens import LogitLens
 
 
@@ -75,12 +77,12 @@ def generate_fast(
     tok: AutoTokenizer,
     prompts: List[str],
     n_gen_per_prompt: int = 1,
-    top_k: int = 1, 
+    top_k: int = 5, #my paper 1
     max_out_len: Optional[int] = None,
     max_new_tokens: Optional[int] = None,
     verbose: bool = False,
     do_sample: bool = True,
-    temperature: float = 0.7,  
+    temperature: float = 0.7, # ori 1.
 ):
     if isinstance(prompts, str):
         prompts = [prompts]
