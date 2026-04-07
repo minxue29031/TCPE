@@ -1,0 +1,79 @@
+Error,brief_description,prompt,subject,target_new,layer_19_TC_ef4,layer_19_TC_ef8,layer_19_MLP
+0,"Error: instead of C-style syntax, use D-style `int[][] mat`","<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+int mat{}``` [/INST] ```d
+", [][],int[][] mat,2,2,0
+1,Error: `std.math.algebraic.sqrt` called with argument types `(int)` matches both:,"<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+b = {}3);``` [/INST] ```d
+b = sqrt(",Math.sqrt(, cast(double),9,9,1
+2,Error: found `>` when expecting `;` following statement `,"<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+Map < String, Integer > mp = new{} < > ();``` [/INST] ```d
+", HashMap,int[string] mp;,10,10,2
+3,"Error: C style cast illegal, use `cast(int)","<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```int solution (int limit) {{
+        if (limit < 2) return 0;
+        long ef1 = 0, ef2 = 2;
+        long sum = ef1 + ef2;
+        while (ef2 <= limit) {{
+                long ef3 = 4 * ef2 + ef1;
+                if (ef3 > limit) break;
+                ef1 = ef2;
+                ef2 = ef3;
+                sum += ef2;
+        }}
+        return{} sum;
+}}``` [/INST] ```d
+int solution(int limit) {{
+    if (limit < 2) return 0;
+    long ef1 = 0, ef2 = 2;
+    long sum = ef1 + ef2;
+    while (ef2 <= limit) {{
+        long ef3 = 4 * ef2 + ef1;
+        if (ef3 > limit) break;
+        ef1 = ef2;
+        ef2 = ef3;
+        sum += ef2;
+    }}
+    return", (int), cast(int),3,3,4
+4,Error: undefined identifier `Integer`,"<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+int min = {};``` [/INST] ```d
+int min =",Integer.MIN_VALUE, int.min;,0,0,6
+5,Error: undefined identifier `Math`,"<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+int x = {} (a - b);
+int y = (Math.abs(a - b));``` [/INST] ```d
+int x =",Math.abs, abs(,0,0,6
+6,Error: cannot implicitly convert expression `cast(ulong)a * s.length` of type `ulong` to `int`,"<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+String str;
+int len = {} ();``` [/INST] ```d
+string str;
+int len =",str.length, cast(int) str.length,5,5,8
+7,Error: identifier expected following comma,"<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+HashMap < Integer, Integer > hm = new HashMap < > ();
+if (hm{} (x)) hm.put(x, y);
+boolean b = hm.containsKey (x);``` [/INST] ```d
+int[int] hm;
+if (",.containsKey,x in hm) hm[x] = y;,6,6,9
+8,"Error: semicolon expected following auto declaration, not `>`","<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+static int f_gold ( int [ ] arr , int n ) {{
+  Queue < Integer > q ={}
+  Arrays . sort ( arr ) ;
+  q . add ( arr [ 0 ] ) ;
+  for ( int i = 1 ;
+  i < n ;
+  i ++ ) {{
+    int now = q . element ( ) ;
+    if ( arr [ i ] >= 2 * now ) q . remove ( ) ;
+    q . add ( arr [ i ] ) ;
+  }}
+  return q . size ( ) ;
+}}
+``` [/INST] ```d
+int f_filled (int[] arr, int n) {{
+   auto q =", new LinkedList < > ( ) ;, DList,1,1,10

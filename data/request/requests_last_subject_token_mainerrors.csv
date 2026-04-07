@@ -1,0 +1,41 @@
+Error,brief_description,prompt,subject,target_new
+0,"Error: instead of C-style syntax, use D-style `int[][] mat`","<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+int mat{}``` [/INST] ```d
+", [][],int[][] mat
+3,"Error: C style cast illegal, use `cast(int)","<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```int solution (int limit) {{
+        if (limit < 2) return 0;
+        long ef1 = 0, ef2 = 2;
+        long sum = ef1 + ef2;
+        while (ef2 <= limit) {{
+                long ef3 = 4 * ef2 + ef1;
+                if (ef3 > limit) break;
+                ef1 = ef2;
+                ef2 = ef3;
+                sum += ef2;
+        }}
+        return{} sum;
+}}``` [/INST] ```d
+int solution(int limit) {{
+    if (limit < 2) return 0;
+    long ef1 = 0, ef2 = 2;
+    long sum = ef1 + ef2;
+    while (ef2 <= limit) {{
+        long ef3 = 4 * ef2 + ef1;
+        if (ef3 > limit) break;
+        ef1 = ef2;
+        ef2 = ef3;
+        sum += ef2;
+    }}
+    return", (int), cast(int)
+4,Error: undefined identifier `Integer`,"<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+int min = {};``` [/INST] ```d
+int min =",Integer.MIN_VALUE, int.min;
+6,Error: cannot implicitly convert expression `cast(ulong)a * s.length` of type `ulong` to `int`,"<s>[INST] Translate the following Java function to its equivalent function in the D programming language (dlang). Only provide the completed function.
+```java
+String str;
+int len = {} ();``` [/INST] ```d
+string str;
+int len =",str.length, cast(int) str.length
