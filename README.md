@@ -33,7 +33,8 @@ pip install -r requirements.txt
    ```bash
    bash sweep/tcpe_precompute.sh
    ```
-    > **Notes:** TransCoder neurons are sparse by nature — only a small subset of neurons activate for any given input. As a result, the quality of the precomputed update matrices is sensitive to the choice of hyperparameters. With poorly chosen values, the set of active neurons may be too small or even empty, yielding zero or degenerate updates. The sweep in tcpe_precompute.sh explores different hyperparameter configurations to identify settings that produce valid, non-trivial update matrices before proceeding to the editing step.
+   **Notes:** 
+   TransCoder neurons are sparse by nature — only a small subset of neurons activate for any given input. As a result, the quality of the precomputed update matrices is sensitive to the choice of hyperparameters. With poorly chosen values, the set of active neurons may be too small or even empty, yielding zero or degenerate updates. The sweep in tcpe_precompute.sh explores different hyperparameter configurations to identify settings that produce valid, non-trivial update matrices before proceeding to the editing step.
 
 4. **Run TCPE Knowledge Editing**
  
@@ -49,12 +50,10 @@ pip install -r requirements.txt
    * `--lim` → Sets the limit on active neurons, allowing experiments with different activity levels.
    * `--abla_exp` → Enables ablation experiments to measure the impact of interventions on the model.
    
-   > **Notes:**
-   > * Ensure that preprocessing (Step 2) has been completed, as the generated update matrices are required.
-   > * Adjust `--lim` and `--abla_exp` according to your experimental setup.
-   > * Outputs will be stored in the designated experiment folder for later evaluation.
-
-
+    **Notes:**
+    * Ensure that preprocessing (Step 2) has been completed, as the generated update matrices are required.
+    * Adjust `--lim` and `--abla_exp` according to your experimental setup.
+ 
 ## Acknowledgments
 
 We gratefully acknowledge that our training code is heavily inspired by **TransCoder** ([GitHub](https://github.com/jacobdunefsky/transcoder_circuits)) and **ROME** ([GitHub](https://github.com/kmeng01/rome)). We thank the authors for their foundational work.
