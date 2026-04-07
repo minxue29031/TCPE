@@ -9,7 +9,7 @@ The key functionalities include:
 * **KECode benchmark**: Provide a new evaluation benchmark for code-to-code translation based on functional equivalence. 
 
 
- ## ⚙️ Installation
+ ## Installation
 
 Install dependencies:
 
